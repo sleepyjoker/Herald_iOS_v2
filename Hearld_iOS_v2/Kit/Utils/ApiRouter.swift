@@ -13,7 +13,7 @@ import RealmSwift
 
 struct ApiHelper {
     
-    static let auth_url = "uc/auth"
+    static let auth_url = "auth"
     static let api_root = "api/"
     
     static let appid = "9f9ce5c3605178daadc2d85ce9f8e064"
@@ -55,7 +55,7 @@ enum QueryAPI {
 
 extension UserAPI: TargetType {
     
-    var baseURL: URL { return URL(string: "https://www.heraldstudio.com/")! }
+    var baseURL: URL { return URL(string: "https://myseu.cn/ws3/")! }
     
     var path: String{
         switch self {
@@ -68,8 +68,10 @@ extension UserAPI: TargetType {
     
     var method: Moya.Method{
         switch self {
-        case .Login, .Info:
+        case .Login:
             return .post
+        case .Info:
+            return .get
         }
     }
     
@@ -92,17 +94,17 @@ extension UserAPI: TargetType {
     var task: Task {
         switch self {
         case .Login(let userID, let password):
-            return .requestParameters(parameters: ["appid": ApiHelper.appid,"user": userID,"password": password], encoding: URLEncoding.queryString)
+            return .requestParameters(parameters: ["cardnum": userID, "password": password, "platform": "ios"], encoding: JSONEncoding.default)
         case .Info():
-            return .requestParameters(parameters: ["uuid": HearldUserDefault.uuid!], encoding: URLEncoding.queryString)
+            return Task.requestPlain
         }
     }
     var headers: [String: String]? {
         switch self {
         case .Login(_,_):
-            return ["Content-type": "application/x-www-form-urlencoded"]
-        case .Info():
             return ["Content-type": "application/json"]
+        case .Info():
+            return ["token": HearldUserDefault.uuid!]
         }
     }
     
@@ -167,7 +169,7 @@ extension SubscribeAPI: TargetType{
             let shchoolNum = realm.objects(User.self).filter("uuid == '\(HearldUserDefault.uuid!)'").first?.shchoolNum
             return .requestParameters(parameters: ["uuid": HearldUserDefault.uuid!,
                                                    "schoolnum": shchoolNum!,
-                                                   "versiontype": "iOS"], encoding: URLEncoding.queryString)
+                                                   "versiontype": "iOS"], encoding: JSONEncoding.default)
         }
     }
     var headers: [String: String]? {
@@ -188,7 +190,7 @@ extension QueryAPI: TargetType{
     var baseURL: URL {
         switch self {
         case .Lecture(), .SRTP(), .GPA():
-            return URL(string: "https://www.heraldstudio.com/")!
+            return URL(string: "https://myseu.cn/ws3/")!
         }
     }
     
@@ -206,7 +208,7 @@ extension QueryAPI: TargetType{
     var method: Moya.Method {
         switch self {
         case .Lecture(), .GPA(), .SRTP():
-            return .post
+            return .get
         }
     }
     
@@ -219,13 +221,8 @@ extension QueryAPI: TargetType{
     
     var task: Task {
         switch self {
-        case .GPA():
-            return .requestParameters(parameters: ["uuid": HearldUserDefault.uuid!], encoding: URLEncoding.queryString)
-        case .Lecture(), .SRTP():
-            let realm = try! Realm()
-            let shchoolNum = realm.objects(User.self).filter("uuid == '\(HearldUserDefault.uuid!)'").first?.shchoolNum
-            return .requestParameters(parameters: ["uuid": HearldUserDefault.uuid!,
-                                                   "schoolnum": shchoolNum!], encoding: URLEncoding.queryString)
+        case .GPA(),.Lecture(), .SRTP():
+            return .requestPlain
         }
     }
     
@@ -233,9 +230,7 @@ extension QueryAPI: TargetType{
     var headers: [String: String]? {
         switch self {
         case .SRTP(), .Lecture(), .GPA():
-            return ["Content-type": "application/json"]
+            return ["Content-type": "application/json","token": HearldUserDefault.uuid!]
         }
     }
-    
-    
 }
