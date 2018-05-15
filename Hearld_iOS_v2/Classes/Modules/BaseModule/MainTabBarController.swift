@@ -72,7 +72,7 @@ class MainTabBarController: UITabBarController {
     }
     
     private func setNavigationBar() {
-        let rightBarButton = UIBarButtonItem(barButtonSystemItem: UIBarButtonSystemItem.add, target: self, action: #selector(self.presentView))
+        let rightBarButton = UIBarButtonItem(barButtonSystemItem: UIBarButtonSystemItem.add, target: self, action: nil)
         rightBarButton.tintColor = #colorLiteral(red: 0.1764705926, green: 0.4980392158, blue: 0.7568627596, alpha: 1)
         
         // 自定义返回按钮
@@ -85,7 +85,7 @@ class MainTabBarController: UITabBarController {
         let attibutesTitle = NSMutableAttributedString.init(string: title)
         let length = (title as NSString).length
         let titleRange = NSRange(location: 0,length: length)
-        attibutesTitle.addAttributes(titleTextAttributes, range: titleRange)
+        attibutesTitle.addAttributes(TextAttributesHelper.titleTextAttributes, range: titleRange)
         titleButton.setAttributedTitle(attibutesTitle, for: .normal)
         
         self.navigationItem.rightBarButtonItem = rightBarButton
@@ -96,10 +96,5 @@ class MainTabBarController: UITabBarController {
     @objc func presentLoginVC() {
         let loginVC = LoginViewController()
         self.navigationController?.pushViewController(loginVC, animated: true)
-    }
-    //临时测试用按钮
-    @objc func presentView() {
-        let VC = GPAViewController()
-        self.navigationController?.pushViewController(VC, animated: true)
     }
 }

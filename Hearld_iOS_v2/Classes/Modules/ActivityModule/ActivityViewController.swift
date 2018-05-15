@@ -26,8 +26,6 @@ class ActivityViewController: UIViewController {
     
     var viewModel = ActivityViewModel()
     let bag = DisposeBag()
-//    let dataSource = RxTableViewSectionedAnimatedDataSource<SectionTableModel>()
-//    typealias SectionTableModel = AnimatableSectionModel<String,ActivityModel>
     let dataSource = RxTableViewSectionedReloadDataSource<SectionTableModel>()
     typealias SectionTableModel = SectionModel<String,ActivityModel>
     
@@ -134,19 +132,9 @@ class ActivityViewController: UIViewController {
             // 介绍
             cell.introductionLabel.text = item.introduction
             
-            // 时间
-            cell.timeLabel.text = "时间: " + item.activity_time
-            
-            //地点
-            cell.locationLabel.text = "地点: " + item.location
-            
             return cell
         }
     }
-    
-//    private func setAnimationConfiguration() {
-//        dataSource.animationConfiguration = AnimationConfiguration(insertAnimation: .fade, reloadAnimation: .fade, deleteAnimation: .fade)
-//    }
     
     private func createSectionModel(_ activityList: [ActivityModel]) -> [SectionTableModel]{
         return [SectionTableModel(model: "", items: activityList)]

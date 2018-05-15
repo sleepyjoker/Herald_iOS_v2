@@ -2,8 +2,8 @@
 //  GPAViewModel.swift
 //  Hearld_iOS_v2
 //
-//  Created by 乔哲锋 on 23/02/2018.
-//  Copyright © 2018 乔哲锋. All rights reserved.
+//  Created by Nathan on 23/02/2018.
+//  Copyright © 2018 Nathan. All rights reserved.
 //
 
 import Foundation
@@ -13,53 +13,49 @@ import SwiftyJSON
 import RxSwift
 import RealmSwift
 import RxCocoa
+import YYCache
 
 class GPAViewModel {
     
-    var modelOfGPA: [GPAModel] = []
+    var gpaModels : [GPAModel] = []
+    
+    /// 单例
+    static let shared = GPAViewModel()
+    
+    private init() {
+        
+    }
     
     fileprivate let GPASubject = PublishSubject<[GPAModel]>()
     var GPAList: Observable<[GPAModel]>{
         return GPASubject.asObservable()
     }
     
+    let cache = YYMemoryCache.init()
+    
     let bag = DisposeBag()
     
     func prepareData(isRefresh: Bool, completionHandler: @escaping ()->()) {
-        // 清空model
-        self.modelOfGPA.removeAll()
-        
-        let realm = try! Realm()
         if isRefresh {
-            // 清空数据库
-            let resultOfGPA = realm.objects(GPAModel.self)
-            db_deleteObjcs(resultOfGPA, with: realm)
-            
+            gpaModels.removeAll()
+            // 清空缓存
+            cache.removeObject(forKey: "gpa")
             // 发起网络请求
             requestGPA { completionHandler() }
         }else {
-            // 查询数据库
-            let resultOfGPA = realm.objects(GPAModel.self)
-            if resultOfGPA.count > 0 {
-                
-                var gpaList : [GPAModel] = []
-                let count = resultOfGPA.count
-                for index in 0 ..< count {
-                    gpaList.append(resultOfGPA[index])
-                }
-                
-                self.GPASubject.onNext(gpaList)
-            
-            }else {
-                // 数据库为空，发起网络请求
+            // 查询缓存
+            if let gpaObjects = cache.object(forKey: "gpa") as? [GPAModel], gpaObjects.count > 0 {
+                self.GPASubject.onNext(gpaObjects)
+                completionHandler()
+            } else {
+                gpaModels.removeAll()
+                // 缓存为空，发起网络请求
                 requestGPA { completionHandler() }
             }
-            
         }
     }
     
     func requestGPA(completionHandler: @escaping ()->()) {
-        var gpaList : [GPAModel] = []
 
         let provider = MoyaProvider<QueryAPI>()
         provider.request(.GPA()) { (result) in
@@ -67,54 +63,48 @@ class GPAViewModel {
             case let .success(moyaResponse):
                 let data = moyaResponse.data
                 let json = JSON(data)
-                gpaList = self.parseGPAModel(json)
-                
-                self.GPASubject.onNext(gpaList)
-                completionHandler()
+                let code = json["code"].stringValue
+                if code == "200" {
+                    self.parseGPAModel(json)
+                    self.GPASubject.onNext(self.gpaModels)
+                    completionHandler()
+                } else if code == "408"{
+                    self.GPASubject.onError(HeraldError.NetworkError)
+                }
             case .failure(_):
-                self.GPASubject.onError(HearldError.NetworkError)
+                self.GPASubject.onError(HeraldError.NetworkError)
             }
         }
     }
     
-    private func parseGPAModel(_ json: JSON) -> [GPAModel] {
-        //解析返回的JSON数据
-        var gpaList : [GPAModel] = []
-        let gpa = json["content"].arrayValue
-        
-        let gpaItem = GPAModel()
-        gpaItem.makeUpGPA = gpa[0]["gpa"].stringValue
-        gpaItem.gpa = gpa[0]["gpa without revamp"].stringValue
-        gpaItem.time = gpa[0]["calculate time"].stringValue
-        
+    private func parseGPAModel(_ json: JSON) {
         guard let realm = try? Realm() else {
-            return []
+            return
         }
-        //获取一卡通号
-        let cardNum = realm.objects(User.self).filter("uuid == '\(HearldUserDefault.uuid!)'").first?.cardID
-        gpaItem.id = cardNum!
-        
-        db_updateObjc(gpaItem, with: realm)
-        gpaList.append(gpaItem)
-        
-        for gpaJSON in gpa.dropFirst() {
-            let gpaItem = GPAModel()
-            gpaItem.name = gpaJSON["name"].stringValue
-            gpaItem.semester = gpaJSON["semester"].stringValue
-                
-            //暂时使用name+type+semester的形式来作为GPAModel的主键
-            gpaItem.id = gpaItem.name + gpaJSON["type"].stringValue + gpaItem.semester
-                
-            gpaItem.credit = gpaJSON["credit"].stringValue
-            gpaItem.score = gpaJSON["score"].stringValue
-                
-            guard let realm = try? Realm() else {
-                return []
+
+        // 基础GPA信息
+        if let user = realm.objects(User.self).filter("uuid == '\(HearldUserDefault.uuid!)'").first{
+            try! realm.write {
+                user.gpa = json["result"]["gpa"].stringValue
+                user.gpaBeforeMakeup = json["result"]["gpaBeforeMakeup"].stringValue
+                user.gpaCalcutionTime = json["result"]["calculationTime"].stringValue
+                realm.add(user, update: true)
             }
-            db_updateObjc(gpaItem, with: realm)
-            gpaList.append(gpaItem)
         }
-        return gpaList
+        
+        // 具体课程信息
+        let gpaArrayValue = json["result"]["detail"].first?.1["courses"].arrayValue
+        for gpaJSON in gpaArrayValue! {
+            let courseName = gpaJSON["courseName"].stringValue
+            let credit = gpaJSON["credit"].stringValue
+            let score = gpaJSON["score"].stringValue
+            let semester = gpaJSON["semester"].stringValue
+            let scoreType = gpaJSON["scoreType"].stringValue
+            
+            let gpaItem = GPAModel(courseName, credit, score, semester, scoreType)
+            gpaModels.append(gpaItem)
+        }
+        cache.setObject(gpaModels, forKey: "gpa")
     }
     
 }
